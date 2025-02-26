@@ -290,14 +290,14 @@ type model struct {
 	easyMeshCommands             map[string]EasyMeshCmd
 	updateButtonClicked          bool
 	dump                         *os.File
+	theme                        Theme
 }
 
 type refreshUIMsg struct {
 	index int
 }
 
-func newModel(platform string) model {
-
+func newModel(platform string, theme Theme) model {
 	easyMeshCommands := CreateEasyMeshCommands()
 	size := len(easyMeshCommands)
 
@@ -312,7 +312,7 @@ func newModel(platform string) model {
 
 	commandList := list.New(items, list.NewDefaultDelegate(), 0, 0)
 	commandList.Title = "OneWifiMesh"
-	commandList.Styles.Title = titleStyle
+	commandList.Styles.Title = theme.TitleStyle
 	commandList.SetShowStatusBar(false)
 	commandList.SetShowPagination(false)
 	commandList.SetShowHelp(false)
@@ -350,6 +350,7 @@ func newModel(platform string) model {
 		dump:                   dump,
 		easyMeshCommands:       easyMeshCommands,
 		updateButtonClicked:    false,
+		theme:                  theme,
 	}
 }
 
@@ -736,22 +737,26 @@ func (m model) View() string {
 
 	//spew.Fprintf(m.dump, "Scroll Index: %d View Height: %d start: %d end: %d\n", m.scrollIndex, m.viewHeight, start, end)
 
-	styledContent := jsonStyle.Width(m.viewWidth).Height(m.viewHeight).Render(strings.Join(m.scrollContent[start:end], "\n"))
+	// styledContent := jsonStyle.Width(m.viewWidth).Height(m.viewHeight).Render(strings.Join(m.scrollContent[start:end], "\n"))
+	styledContent := m.theme.JSONStyle.Width(m.viewWidth).Height(m.viewHeight).Render(strings.Join(m.scrollContent[start:end], "\n"))
 	statusView = styledContent + m.currentOperatingInstructions
 
-	updateButton := buttonStyle.Render("Update")
-	applyButton := buttonStyle.Render("Apply")
-	cancelButton := buttonStyle.Render("Cancel")
+	// updateButton := buttonStyle.Render("Update")
+	// applyButton := buttonStyle.Render("Apply")
+	// cancelButton := buttonStyle.Render("Cancel")
+	updateButton := m.theme.ButtonStyle.Render("Update")
+	applyButton := m.theme.ButtonStyle.Render("Apply")
+	cancelButton := m.theme.ButtonStyle.Render("Cancel")
 
 	switch m.activeButton {
 	case BTN_UPDATE:
-		updateButton = activeButtonStyle.Render("Update")
+		updateButton = m.theme.ActiveButtonStyle.Render("Update")
 
 	case BTN_APPLY:
-		applyButton = activeButtonStyle.Render("Apply")
+		applyButton = m.theme.ActiveButtonStyle.Render("Apply")
 
 	case BTN_CANCEL:
-		cancelButton = activeButtonStyle.Render("Cancel")
+		cancelButton = m.theme.ActiveButtonStyle.Render("Cancel")
 	}
 
 	buttons := lipgloss.JoinHorizontal(lipgloss.Center, updateButton, applyButton, cancelButton)
@@ -760,8 +765,8 @@ func (m model) View() string {
 
 	combinedView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		menuBodyStyle.Width(m.menuWidth).Height(m.menuHeight).Render(menuViewWithInstructions),
-		canvasStyle.Width(m.canvasWidth).Height(m.canvasHeight).Render(statusView),
+		m.theme.MenuBodyStyle.Width(m.menuWidth).Height(m.menuHeight).Render(menuViewWithInstructions),
+		m.theme.CanvasStyle.Width(m.canvasWidth).Height(m.canvasHeight).Render(statusView),
 	)
 
 	commonBorderStyle := lipgloss.NewStyle().
@@ -774,12 +779,26 @@ func (m model) View() string {
 }
 
 func main() {
-	if len(os.Args[1:]) != 1 {
-		fmt.Println("Invalid Arguments, please specify platform name")
-		os.Exit(1)
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		fmt.Println("Invalid arguments. Usage: %s <platform> [theme]")
+		os.Exit(1);
+	}
+	// if len(os.Args[1:])  1 {
+	// 	fmt.Println("Invalid Arguments, please specify platform name")
+	// 	os.Exit(1)
+	// }
+	// default theme
+	themeChoice := Light
+	if len(os.Args) == 3 {
+		var err error
+		themeChoice, err = ParseTheme(os.Args[2])
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1);
+		}
 	}
 
-	program = tea.NewProgram(newModel(os.Args[1]), tea.WithAltScreen())
+	program = tea.NewProgram(newModel(os.Args[1], NewTheme(themeChoice)), tea.WithAltScreen())
 
 	if _, err := program.Run(); err != nil {
 		fmt.Println("Error running program:", err)
